@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="com.flutter.background.activity.launch.flutter_alarm_background_trigger">
+
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+
+    <application>
+        <receiver android:name=".AlarmBroadcastReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
