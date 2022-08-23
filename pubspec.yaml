@@ -1,6 +1,6 @@
 name: flutter_alarm_background_trigger
-description: A new Flutter project.
-version: 0.0.1
+description: A flutter plugin for Android to launch app from background at specific time just like stock alarm app in Android.
+version: 1.0.1
 homepage: https://github.com/ishaquehassan/flutter_alarm_background_trigger
 
 environment:
