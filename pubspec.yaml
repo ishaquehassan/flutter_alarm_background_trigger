@@ -1,7 +1,7 @@
 name: flutter_alarm_background_trigger
 description: A new Flutter project.
 version: 0.0.1
-homepage: https://dart.dev/tools/pub/pubspec
+homepage: https://github.com/ishaquehassan/flutter_alarm_background_trigger
 
 environment:
   sdk: ">=2.17.3 <3.0.0"
