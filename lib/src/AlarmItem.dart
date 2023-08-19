@@ -27,20 +27,17 @@ class AlarmItem {
       this.screenWakeDuration});
 
   factory AlarmItem.fromJson(Map<String, dynamic> data) {
-    var alarm = AlarmItem();
-    alarm.id = data['id'];
-    alarm.time = DateTime.fromMillisecondsSinceEpoch(data['time']);
-    if (data['payload'] != null) {
-      alarm.payload = jsonDecode(data['payload']);
-    }
-    alarm.uid = data['userUid'];
-    alarm.status = AlarmStatus.values[AlarmStatus.values
-        .map((e) => describeEnum(e))
-        .toList()
-        .indexOf(data['status'])];
-    alarm.screenWakeDuration =
-        Duration(milliseconds: data['screenWakeDuration']);
-    return alarm;
+    return AlarmItem(
+      id: data['id'] ?? data['a'],
+      time: DateTime.fromMillisecondsSinceEpoch(data['time'] ?? data['b']),
+      payload: data['payload'] != null ? jsonDecode(data['payload']) : null,
+      uid: data['userUid'],
+      status: AlarmStatus.values.firstWhere(
+        (e) => describeEnum(e) == (data['status'] ?? data['f']),
+      ),
+      screenWakeDuration:
+          Duration(milliseconds: data['screenWakeDuration'] ?? data['g']),
+    );
   }
 
   static List<AlarmItem> fromJsonList(List<dynamic> list) {
