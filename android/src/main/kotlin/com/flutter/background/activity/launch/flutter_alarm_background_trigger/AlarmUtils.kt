@@ -42,8 +42,14 @@ class AlarmUtils() {
     }
 
     private fun createPendingIntent(item: AlarmItem, args: AlarmArgs): PendingIntent {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
         return PendingIntent.getBroadcast(
-            context, Constants.ALARM_REQ_ID, Intent(
+            context, item.id, Intent(
                 context, AlarmBroadcastReceiver::class.java
             ).apply {
                 putExtra(AlarmArgKey.PAYLOAD.name,item.payload)
@@ -53,7 +59,7 @@ class AlarmUtils() {
                 putExtra(AlarmArgKey.STATUS.name,item.status.name)
                 putExtra(AlarmArgKey.SCREEN_WAKE_DURATION.name,args.screenWakeDuration)
             },
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+            flags
         )
     }
 
@@ -141,12 +147,14 @@ class AlarmUtils() {
         onBackgroundActivityLaunch(FlutterAlarmBackgroundTriggerPlugin.channel!!)
     }
 
-    fun onBackgroundActivityLaunch(channel: MethodChannel): Boolean {
+    fun onBackgroundActivityLaunch(channel: MethodChannel) {
         val pendingAlarms = alarms.findByStatus(AlarmStatus.PENDING.name)
         
         if (pendingAlarms!!.isEmpty()) {
-            return false
+            return
         }
+
+        var alarmIsDone = false
     
         pendingAlarms.also {
             pendingAlarms.forEach {
@@ -154,12 +162,14 @@ class AlarmUtils() {
                     alarms.update(it.apply {
                         status = AlarmStatus.DONE
                     })
+                    alarmIsDone = true
                 }
             }
         }
-    
-        sendBackgroundAlarmEvent(channel, pendingAlarms)
-        return true
+
+        if (alarmIsDone) {
+            sendBackgroundAlarmEvent(channel, pendingAlarms)
+        }
     }
 
     private fun sendBackgroundAlarmEvent(channel: MethodChannel,alarms: List<AlarmItem>) {
