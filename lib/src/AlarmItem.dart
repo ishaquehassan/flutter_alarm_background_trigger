@@ -30,8 +30,8 @@ class AlarmItem {
     return AlarmItem(
       id: data['id'] ?? data['a'],
       time: DateTime.fromMillisecondsSinceEpoch(data['time'] ?? data['b']),
-      payload: data['payload'] != null ? jsonDecode(data['payload']) : null,
-      uid: data['userUid'],
+      payload: jsonDecode(data['payload'] ?? data['c'] ?? 'null'),
+      uid: data['userUid'] ?? data['d'],
       status: AlarmStatus.values.firstWhere(
         (e) => describeEnum(e) == (data['status'] ?? data['f']),
       ),

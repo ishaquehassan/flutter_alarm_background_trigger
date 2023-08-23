@@ -33,14 +33,6 @@ class AlarmUtils() {
     private lateinit var db: AlarmDatabase
     private lateinit var alarms: AlarmDao
 
-    private fun disableAlarm(item: AlarmItem, args: AlarmArgs) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
-    
-        val pendingIntent = createPendingIntent(item, args)
-        
-        alarmManager?.cancel(pendingIntent)
-    }
-
     private fun createPendingIntent(item: AlarmItem, args: AlarmArgs): PendingIntent {
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -68,7 +60,20 @@ class AlarmUtils() {
     
         val pendingIntent = createPendingIntent(item, args)
     
-        alarmManager?.set(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        } else {
+            // On older devices, use setExact for accurate timing (less battery-friendly)
+            alarmManager?.setExact(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        }
+    }
+
+    private fun cancelAlarm(item: AlarmItem, args: AlarmArgs) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
+    
+        val pendingIntent = createPendingIntent(item, args)
+        
+        alarmManager?.cancel(pendingIntent)
     }
 
     private fun sendSingleAlarm(result: Result,alarm: AlarmItem?) {
@@ -118,7 +123,7 @@ class AlarmUtils() {
     }
 
     fun deleteAlarm(args: AlarmArgs,result: Result) {
-        disableAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
+        cancelAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
         alarms.delete(AlarmItem.fromAlarmArgs(args))
         result.success(true)
     }
@@ -153,8 +158,6 @@ class AlarmUtils() {
         if (pendingAlarms!!.isEmpty()) {
             return
         }
-
-        var alarmIsDone = false
     
         pendingAlarms.also {
             pendingAlarms.forEach {
@@ -162,14 +165,11 @@ class AlarmUtils() {
                     alarms.update(it.apply {
                         status = AlarmStatus.DONE
                     })
-                    alarmIsDone = true
                 }
             }
         }
 
-        if (alarmIsDone) {
             sendBackgroundAlarmEvent(channel, pendingAlarms)
-        }
     }
 
     private fun sendBackgroundAlarmEvent(channel: MethodChannel,alarms: List<AlarmItem>) {
