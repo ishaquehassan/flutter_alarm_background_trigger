@@ -42,10 +42,17 @@ class MethodChannelFlutterAlarmBackgroundTrigger
 
   @override
   void onForegroundAlarmEventHandler(OnForegroundAlarmEvent alarmEvent) {
-    methodChannel.setMethodCallHandler((call) {
+    methodChannel.setMethodCallHandler((call) async {
       if (call.method ==
           describeEnum(ChannelMethods.ON_BACKGROUND_ACTIVITY_LAUNCH)) {
-        alarmEvent(AlarmItem.fromJsonList(jsonDecode(call.arguments)));
+        DateTime now = DateTime.now();
+        final alarms = await getAllAlarms();
+        final alarmIsDone = alarms.any(
+            (a) => (a.time!.isBefore(now) || a.time!.isAtSameMomentAs(now)));
+
+        if (alarmIsDone) {
+          alarmEvent(alarms);
+        }
       }
       return Future.value();
     });

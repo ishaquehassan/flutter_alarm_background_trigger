@@ -33,17 +33,15 @@ class AlarmUtils() {
     private lateinit var db: AlarmDatabase
     private lateinit var alarms: AlarmDao
 
-    private fun disableAlarm(item: AlarmItem, args: AlarmArgs) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
-    
-        val pendingIntent = createPendingIntent(item, args)
-        
-        alarmManager?.cancel(pendingIntent)
-    }
-
     private fun createPendingIntent(item: AlarmItem, args: AlarmArgs): PendingIntent {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
         return PendingIntent.getBroadcast(
-            context, Constants.ALARM_REQ_ID, Intent(
+            context, item.id, Intent(
                 context, AlarmBroadcastReceiver::class.java
             ).apply {
                 putExtra(AlarmArgKey.PAYLOAD.name,item.payload)
@@ -53,7 +51,7 @@ class AlarmUtils() {
                 putExtra(AlarmArgKey.STATUS.name,item.status.name)
                 putExtra(AlarmArgKey.SCREEN_WAKE_DURATION.name,args.screenWakeDuration)
             },
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+            flags
         )
     }
 
@@ -62,7 +60,20 @@ class AlarmUtils() {
     
         val pendingIntent = createPendingIntent(item, args)
     
-        alarmManager?.set(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        } else {
+            // On older devices, use setExact for accurate timing (less battery-friendly)
+            alarmManager?.setExact(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        }
+    }
+
+    private fun cancelAlarm(item: AlarmItem, args: AlarmArgs) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
+    
+        val pendingIntent = createPendingIntent(item, args)
+        
+        alarmManager?.cancel(pendingIntent)
     }
 
     private fun sendSingleAlarm(result: Result,alarm: AlarmItem?) {
@@ -112,7 +123,7 @@ class AlarmUtils() {
     }
 
     fun deleteAlarm(args: AlarmArgs,result: Result) {
-        disableAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
+        cancelAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
         alarms.delete(AlarmItem.fromAlarmArgs(args))
         result.success(true)
     }
@@ -141,11 +152,11 @@ class AlarmUtils() {
         onBackgroundActivityLaunch(FlutterAlarmBackgroundTriggerPlugin.channel!!)
     }
 
-    fun onBackgroundActivityLaunch(channel: MethodChannel): Boolean {
+    fun onBackgroundActivityLaunch(channel: MethodChannel) {
         val pendingAlarms = alarms.findByStatus(AlarmStatus.PENDING.name)
         
         if (pendingAlarms!!.isEmpty()) {
-            return false
+            return
         }
     
         pendingAlarms.also {
@@ -157,9 +168,8 @@ class AlarmUtils() {
                 }
             }
         }
-    
-        sendBackgroundAlarmEvent(channel, pendingAlarms)
-        return true
+
+            sendBackgroundAlarmEvent(channel, pendingAlarms)
     }
 
     private fun sendBackgroundAlarmEvent(channel: MethodChannel,alarms: List<AlarmItem>) {
