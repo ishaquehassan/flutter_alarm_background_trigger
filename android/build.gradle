@@ -26,6 +26,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-kapt'
 
 android {
+    namespace 'com.flutter.background.activity.launch.flutter_alarm_background_trigger'
     compileSdkVersion 31
 
     compileOptions {
