@@ -122,55 +122,67 @@ class AlarmUtils() {
         sendListOfAlarms(result,alarms.getAll())
     }
 
-    fun deleteAlarm(args: AlarmArgs,result: Result) {
-        cancelAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarm(args: AlarmArgs, result: Result) {
+        val item = alarms.findByUserId(args.id!!)
+        if (item != null) {
+            cancelAlarm(item, args)
+            alarms.delete(item)
+            result.success(true)
+        } else {
+            result.error("NOT_FOUND", "Alarm not found", null)
+        }
     }
 
-    fun deleteAlarmByTime(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByTime(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByTime(args.time!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByTime(args.time!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAlarmByUid(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByUid(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByUserUid(args.uid!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByUid(args.uid!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAlarmByPayload(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByPayload(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByPayload(args.payload!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByPayload(args.payload!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAllAlarms(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAllAlarms(args: AlarmArgs, result: Result) {
+        val allAlarms = alarms.getAll() ?: emptyList()
+        allAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteAll()
+        result.success(affected > 0)
     }
+
 
     fun initialize(args: AlarmArgs,result: Result){
         onBackgroundActivityLaunch(FlutterAlarmBackgroundTriggerPlugin.channel!!)
     }
 
     fun onBackgroundActivityLaunch(channel: MethodChannel) {
-        val pendingAlarms = alarms.findByStatus(AlarmStatus.PENDING.name)
-        
-        if (pendingAlarms!!.isEmpty()) {
-            return
-        }
-    
-        pendingAlarms.also {
-            pendingAlarms.forEach {
-                if (it.time!! <= System.currentTimeMillis()) {
-                    alarms.update(it.apply {
-                        status = AlarmStatus.DONE
-                    })
-                }
-            }
-        }
+    val pending = alarms.findByStatus(AlarmStatus.PENDING.name) ?: emptyList()
+    if (pending.isEmpty()) return
 
-            sendBackgroundAlarmEvent(channel, pendingAlarms)
+    val now = System.currentTimeMillis()
+    val due = pending.filter { it.time != null && it.time!! <= now }
+
+    if (due.isEmpty()) return
+
+    // Mark due alarms as DONE before sending
+    due.forEach { item ->
+        item.status = AlarmStatus.DONE
+        alarms.update(item)
     }
+
+    sendBackgroundAlarmEvent(channel, due)
+}
 
     private fun sendBackgroundAlarmEvent(channel: MethodChannel,alarms: List<AlarmItem>) {
         channel.invokeMethod(MethodNames.ON_BACKGROUND_ACTIVITY_LAUNCH.name,JSONArray(alarms.map { it.serializeToMap() }.toList()).toString())

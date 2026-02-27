@@ -45,12 +45,10 @@ class MethodChannelFlutterAlarmBackgroundTrigger
     methodChannel.setMethodCallHandler((call) async {
       if (call.method ==
           describeEnum(ChannelMethods.ON_BACKGROUND_ACTIVITY_LAUNCH)) {
-        DateTime now = DateTime.now();
-        final alarms = await getAllAlarms();
-        final alarmIsDone = alarms.any(
-            (a) => (a.time!.isBefore(now) || a.time!.isAtSameMomentAs(now)));
-
-        if (alarmIsDone) {
+        final String? raw = call.arguments as String?;
+        if (raw != null) {
+          final List<dynamic> jsonList = jsonDecode(raw);
+          final alarms = AlarmItem.fromJsonList(jsonList);
           alarmEvent(alarms);
         }
       }
@@ -81,42 +79,36 @@ class MethodChannelFlutterAlarmBackgroundTrigger
 
   @override
   Future<List<AlarmItem>> getAllAlarms() async {
-    return AlarmItem.fromJsonList(jsonDecode(
-            (await invokeNativeMethod<String>(ChannelMethods.GET_ALL))!) ??
-        []);
+    final raw = await invokeNativeMethod<String>(ChannelMethods.GET_ALL);
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
   Future<AlarmItem> getAlarm(int id) async {
-    var alarm = AlarmItem(id: id);
-    return AlarmItem.fromJson(jsonDecode(
-            (await invokeNativeMethod<String>(ChannelMethods.GET, alarm))!) ??
-        {});
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET, AlarmItem(id: id));
+    return AlarmItem.fromJson(jsonDecode(raw ?? '{}'));
   }
 
   @override
-  Future<List<AlarmItem>> getAlarmByTime(DateTime time) async {
-    var alarm = AlarmItem(time: time);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_TIME, alarm))!) ??
-        []);
+  Future<List<AlarmItem>> getAlarmByTime(DateTime dateTime) async {
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_TIME, AlarmItem(time: dateTime));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
   Future<List<AlarmItem>> getAlarmByUid(String uid) async {
-    var alarm = AlarmItem(uid: uid);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_UID, alarm))!) ??
-        []);
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_UID, AlarmItem(uid: uid));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
-  Future<List<AlarmItem>> getAlarmByPayload(
-      Map<String, dynamic> payload) async {
-    var alarm = AlarmItem(payload: payload);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_PAYLOAD, alarm))!) ??
-        []);
+  Future<List<AlarmItem>> getAlarmByPayload(Map<String, dynamic> payload) async {
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_PAYLOAD, AlarmItem(payload: payload));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
