@@ -64,4 +64,8 @@ class AlarmMethods {
   Future<void> deleteAllAlarms() {
     throw UnimplementedError('deleteAllAlarms() has not been implemented.');
   }
+
+  Future<void> moveToBackground() {
+    throw UnimplementedError('moveToBackground() has not been implemented.');
+  }
 }

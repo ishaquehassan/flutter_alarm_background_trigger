@@ -29,7 +29,8 @@ enum ChannelMethods {
   // Others
   REQUEST_PERMISSION,
   ON_BACKGROUND_ACTIVITY_LAUNCH,
-  INITIALIZE
+  INITIALIZE,
+  MOVE_TO_BACKGROUND
 }
 
 /// An implementation of [FlutterAlarmBackgroundTriggerPlatform] that uses method channels.
@@ -138,5 +139,10 @@ class MethodChannelFlutterAlarmBackgroundTrigger
   @override
   Future<void> deleteAllAlarms() {
     return invokeNativeMethod<void>(ChannelMethods.DELETE_ALL);
+  }
+
+  @override
+  Future<void> moveToBackground() {
+    return invokeNativeMethod<void>(ChannelMethods.MOVE_TO_BACKGROUND);
   }
 }
