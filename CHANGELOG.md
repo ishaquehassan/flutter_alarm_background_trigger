@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0
+
+* Added `moveToBackground()` functionality to send the app to background on Android.
+
 ## 1.0.0
 
 * Implemented background alarm trigger with broadcast receiver from android

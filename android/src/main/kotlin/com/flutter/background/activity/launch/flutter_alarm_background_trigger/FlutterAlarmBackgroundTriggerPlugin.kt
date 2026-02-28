@@ -34,7 +34,8 @@ enum class MethodNames {
     // Others
     REQUEST_PERMISSION,
     ON_BACKGROUND_ACTIVITY_LAUNCH,
-    INITIALIZE
+    INITIALIZE,
+    MOVE_TO_BACKGROUND
 }
 
 /** FlutterAlarmBackgroundTriggerPlugin */
@@ -82,6 +83,7 @@ class FlutterAlarmBackgroundTriggerPlugin : FlutterPlugin, MethodCallHandler, Ac
         // Others
         MethodNames.REQUEST_PERMISSION to { true },
         MethodNames.INITIALIZE to { true },
+        MethodNames.MOVE_TO_BACKGROUND to { true },
     )
 
 
@@ -140,6 +142,7 @@ class FlutterAlarmBackgroundTriggerPlugin : FlutterPlugin, MethodCallHandler, Ac
             // Others
             MethodNames.REQUEST_PERMISSION to ::requestPermission,
             MethodNames.INITIALIZE to alarmUtils!!::initialize,
+            MethodNames.MOVE_TO_BACKGROUND to ::moveToBackground,
         )
 
         handleLifeCycle()
@@ -171,6 +174,11 @@ class FlutterAlarmBackgroundTriggerPlugin : FlutterPlugin, MethodCallHandler, Ac
     }
 
     private var permissionResult: Result? = null
+
+    private fun moveToBackground(args: AlarmArgs?, result: Result?) {
+        activityBinding.activity.moveTaskToBack(true)
+        result?.success(true)
+    }
 
     private fun requestPermission(args: AlarmArgs?,result: Result?) {
         if(result != null){

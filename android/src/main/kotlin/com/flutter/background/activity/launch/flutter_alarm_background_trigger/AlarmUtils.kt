@@ -33,17 +33,15 @@ class AlarmUtils() {
     private lateinit var db: AlarmDatabase
     private lateinit var alarms: AlarmDao
 
-    private fun disableAlarm(item: AlarmItem, args: AlarmArgs) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
-    
-        val pendingIntent = createPendingIntent(item, args)
-        
-        alarmManager?.cancel(pendingIntent)
-    }
-
     private fun createPendingIntent(item: AlarmItem, args: AlarmArgs): PendingIntent {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
         return PendingIntent.getBroadcast(
-            context, Constants.ALARM_REQ_ID, Intent(
+            context, item.id, Intent(
                 context, AlarmBroadcastReceiver::class.java
             ).apply {
                 putExtra(AlarmArgKey.PAYLOAD.name,item.payload)
@@ -53,7 +51,7 @@ class AlarmUtils() {
                 putExtra(AlarmArgKey.STATUS.name,item.status.name)
                 putExtra(AlarmArgKey.SCREEN_WAKE_DURATION.name,args.screenWakeDuration)
             },
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE else PendingIntent.FLAG_UPDATE_CURRENT
+            flags
         )
     }
 
@@ -62,7 +60,20 @@ class AlarmUtils() {
     
         val pendingIntent = createPendingIntent(item, args)
     
-        alarmManager?.set(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager?.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        } else {
+            // On older devices, use setExact for accurate timing (less battery-friendly)
+            alarmManager?.setExact(AlarmManager.RTC_WAKEUP, item.time!!, pendingIntent)
+        }
+    }
+
+    private fun cancelAlarm(item: AlarmItem, args: AlarmArgs) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager?
+    
+        val pendingIntent = createPendingIntent(item, args)
+        
+        alarmManager?.cancel(pendingIntent)
     }
 
     private fun sendSingleAlarm(result: Result,alarm: AlarmItem?) {
@@ -111,56 +122,67 @@ class AlarmUtils() {
         sendListOfAlarms(result,alarms.getAll())
     }
 
-    fun deleteAlarm(args: AlarmArgs,result: Result) {
-        disableAlarm(AlarmItem.fromAlarmArgs(args)!!, args)
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarm(args: AlarmArgs, result: Result) {
+        val item = alarms.findByUserId(args.id!!)
+        if (item != null) {
+            cancelAlarm(item, args)
+            alarms.delete(item)
+            result.success(true)
+        } else {
+            result.error("NOT_FOUND", "Alarm not found", null)
+        }
     }
 
-    fun deleteAlarmByTime(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByTime(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByTime(args.time!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByTime(args.time!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAlarmByUid(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByUid(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByUserUid(args.uid!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByUid(args.uid!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAlarmByPayload(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAlarmByPayload(args: AlarmArgs, result: Result) {
+        val affectedAlarms = alarms.findByPayload(args.payload!!) ?: emptyList()
+        affectedAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteByPayload(args.payload!!)
+        result.success(affected > 0)
     }
 
-    fun deleteAllAlarms(args: AlarmArgs,result: Result) {
-        alarms.delete(AlarmItem.fromAlarmArgs(args))
-        result.success(true)
+    fun deleteAllAlarms(args: AlarmArgs, result: Result) {
+        val allAlarms = alarms.getAll() ?: emptyList()
+        allAlarms.forEach { cancelAlarm(it, args) }
+        val affected = alarms.deleteAll()
+        result.success(affected > 0)
     }
+
 
     fun initialize(args: AlarmArgs,result: Result){
         onBackgroundActivityLaunch(FlutterAlarmBackgroundTriggerPlugin.channel!!)
     }
 
-    fun onBackgroundActivityLaunch(channel: MethodChannel): Boolean {
-        val pendingAlarms = alarms.findByStatus(AlarmStatus.PENDING.name)
-        
-        if (pendingAlarms!!.isEmpty()) {
-            return false
-        }
-    
-        pendingAlarms.also {
-            pendingAlarms.forEach {
-                if (it.time!! <= System.currentTimeMillis()) {
-                    alarms.update(it.apply {
-                        status = AlarmStatus.DONE
-                    })
-                }
-            }
-        }
-    
-        sendBackgroundAlarmEvent(channel, pendingAlarms)
-        return true
+    fun onBackgroundActivityLaunch(channel: MethodChannel) {
+    val pending = alarms.findByStatus(AlarmStatus.PENDING.name) ?: emptyList()
+    if (pending.isEmpty()) return
+
+    val now = System.currentTimeMillis()
+    val due = pending.filter { it.time != null && it.time!! <= now }
+
+    if (due.isEmpty()) return
+
+    // Mark due alarms as DONE before sending
+    due.forEach { item ->
+        item.status = AlarmStatus.DONE
+        alarms.update(item)
     }
+
+    sendBackgroundAlarmEvent(channel, due)
+}
 
     private fun sendBackgroundAlarmEvent(channel: MethodChannel,alarms: List<AlarmItem>) {
         channel.invokeMethod(MethodNames.ON_BACKGROUND_ACTIVITY_LAUNCH.name,JSONArray(alarms.map { it.serializeToMap() }.toList()).toString())

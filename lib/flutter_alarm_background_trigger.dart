@@ -69,4 +69,8 @@ class FlutterAlarmBackgroundTrigger implements AlarmMethods {
   @override
   Future<List<AlarmItem>> getAllAlarms() =>
       FlutterAlarmBackgroundTriggerPlatform.instance.getAllAlarms();
+
+  @override
+  Future<void> moveToBackground() =>
+      FlutterAlarmBackgroundTriggerPlatform.instance.moveToBackground();
 }

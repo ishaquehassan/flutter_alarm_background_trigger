@@ -29,7 +29,8 @@ enum ChannelMethods {
   // Others
   REQUEST_PERMISSION,
   ON_BACKGROUND_ACTIVITY_LAUNCH,
-  INITIALIZE
+  INITIALIZE,
+  MOVE_TO_BACKGROUND
 }
 
 /// An implementation of [FlutterAlarmBackgroundTriggerPlatform] that uses method channels.
@@ -42,10 +43,15 @@ class MethodChannelFlutterAlarmBackgroundTrigger
 
   @override
   void onForegroundAlarmEventHandler(OnForegroundAlarmEvent alarmEvent) {
-    methodChannel.setMethodCallHandler((call) {
+    methodChannel.setMethodCallHandler((call) async {
       if (call.method ==
           describeEnum(ChannelMethods.ON_BACKGROUND_ACTIVITY_LAUNCH)) {
-        alarmEvent(AlarmItem.fromJsonList(jsonDecode(call.arguments)));
+        final String? raw = call.arguments as String?;
+        if (raw != null) {
+          final List<dynamic> jsonList = jsonDecode(raw);
+          final alarms = AlarmItem.fromJsonList(jsonList);
+          alarmEvent(alarms);
+        }
       }
       return Future.value();
     });
@@ -74,42 +80,36 @@ class MethodChannelFlutterAlarmBackgroundTrigger
 
   @override
   Future<List<AlarmItem>> getAllAlarms() async {
-    return AlarmItem.fromJsonList(jsonDecode(
-            (await invokeNativeMethod<String>(ChannelMethods.GET_ALL))!) ??
-        []);
+    final raw = await invokeNativeMethod<String>(ChannelMethods.GET_ALL);
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
   Future<AlarmItem> getAlarm(int id) async {
-    var alarm = AlarmItem(id: id);
-    return AlarmItem.fromJson(jsonDecode(
-            (await invokeNativeMethod<String>(ChannelMethods.GET, alarm))!) ??
-        {});
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET, AlarmItem(id: id));
+    return AlarmItem.fromJson(jsonDecode(raw ?? '{}'));
   }
 
   @override
-  Future<List<AlarmItem>> getAlarmByTime(DateTime time) async {
-    var alarm = AlarmItem(time: time);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_TIME, alarm))!) ??
-        []);
+  Future<List<AlarmItem>> getAlarmByTime(DateTime dateTime) async {
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_TIME, AlarmItem(time: dateTime));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
   Future<List<AlarmItem>> getAlarmByUid(String uid) async {
-    var alarm = AlarmItem(uid: uid);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_UID, alarm))!) ??
-        []);
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_UID, AlarmItem(uid: uid));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
-  Future<List<AlarmItem>> getAlarmByPayload(
-      Map<String, dynamic> payload) async {
-    var alarm = AlarmItem(payload: payload);
-    return AlarmItem.fromJsonList(jsonDecode((await invokeNativeMethod<String>(
-            ChannelMethods.GET_BY_PAYLOAD, alarm))!) ??
-        []);
+  Future<List<AlarmItem>> getAlarmByPayload(Map<String, dynamic> payload) async {
+    final raw = await invokeNativeMethod<String>(
+        ChannelMethods.GET_BY_PAYLOAD, AlarmItem(payload: payload));
+    return AlarmItem.fromJsonList(jsonDecode(raw ?? '[]'));
   }
 
   @override
@@ -139,5 +139,10 @@ class MethodChannelFlutterAlarmBackgroundTrigger
   @override
   Future<void> deleteAllAlarms() {
     return invokeNativeMethod<void>(ChannelMethods.DELETE_ALL);
+  }
+
+  @override
+  Future<void> moveToBackground() {
+    return invokeNativeMethod<void>(ChannelMethods.MOVE_TO_BACKGROUND);
   }
 }
